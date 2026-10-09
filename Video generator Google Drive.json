@@ -1,0 +1,305 @@
+{
+  "name": "Video generator Google Drive",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Image Generator",
+        "formDescription": "Masukkan deskripsi gambar yang ingin dibuat.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "img_url",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "prompt",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -1552,
+        48
+      ],
+      "id": "ed14608d-0bdd-4f4b-9cf4-6b15fdff4139",
+      "name": "Input Prompt",
+      "webhookId": "31cb8b85-eba6-4646-a5fa-20e0f913c4c3"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.kie.ai/api/v1/jobs/createTask",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"grok-imagine/image-to-video\",\n  \"input\": {\n    \"image_urls\": [\n      \"{{$json.img_url}}\"\n    ],\n    \"prompt\": \"{{$json.prompt}}\",\n    \"mode\": \"normal\",\n    \"duration\": \"6\",\n    \"resolution\": \"480p\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -1328,
+        48
+      ],
+      "id": "f24148a2-96a0-4363-a14a-d6550cd8f73a",
+      "name": "Buat Task",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "QGxQuXjuFj7Ro0Gz",
+          "name": "Kie AI Key Video"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.kie.ai/api/v1/jobs/recordInfo",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "taskId",
+              "value": "={{ $('Buat Task').item.json.data.taskId }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -896,
+        48
+      ],
+      "id": "86f105a8-d82d-4263-9d0c-5b04882e00cb",
+      "name": "Cek Status",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "QGxQuXjuFj7Ro0Gz",
+          "name": "Kie AI Key Video"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "49b7357e-6fea-4f6e-b857-7fc00808702c",
+              "leftValue": "={{ $json.data.state }}",
+              "rightValue": "success",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -656,
+        48
+      ],
+      "id": "6f6892ea-c466-4194-bd56-677fdb88c25d",
+      "name": "Status Success?"
+    },
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -1120,
+        352
+      ],
+      "id": "5dcdb12f-523e-41fc-b4a6-a053e7a5de6d",
+      "name": "Tunggu 20 detik",
+      "webhookId": "ad7a346b-c9af-4962-b3b3-1bab203753ed"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ambil data respons dari node Cek Status\nconst data = $input.first().json.data;\n\n// resultJson berupa string, ubah jadi objek JavaScript\nconst hasil = JSON.parse(data.resultJson);\nconst urls = hasil.resultUrls;\n\n// Validasi array hasil\nif (!Array.isArray(urls) || urls.length === 0) {\n  throw new Error('resultUrls kosong atau tidak ditemukan');\n}\n\n// Ambil URL pertama yang valid\nconst videoUrl = urls.find(u => typeof u === 'string' && u.startsWith('http'));\nif (!videoUrl) {\n  throw new Error('Tidak ada URL video yang valid');\n}\n\nreturn [{ json: { videoUrl } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        32
+      ],
+      "id": "0aed125b-b1ac-4709-a54f-2e3abe84df66",
+      "name": "Ambil URL Video"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.videoUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        -192,
+        16
+      ],
+      "id": "2bf41f1d-eb20-47d8-91da-332735c4b6da",
+      "name": "Unduh Video"
+    },
+    {
+      "parameters": {
+        "name": "={{ $now.format('yyyyMMdd-HHmmss') }}.mp4",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1NzM1-i7zaaGkI1MjF0WWGzreis6AJ7MP",
+          "mode": "list",
+          "cachedResultName": "vidio Ai",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1NzM1-i7zaaGkI1MjF0WWGzreis6AJ7MP"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        32,
+        16
+      ],
+      "id": "355e5a9c-f4c3-4b7e-a1f6-99a521cbf921",
+      "name": "Upload ke Google Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "taxBh6ibUCCMJFMp",
+          "name": "Google Drive account 3"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Input Prompt": {
+      "main": [
+        [
+          {
+            "node": "Buat Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buat Task": {
+      "main": [
+        [
+          {
+            "node": "Tunggu 20 detik",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cek Status": {
+      "main": [
+        [
+          {
+            "node": "Status Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Status Success?": {
+      "main": [
+        [
+          {
+            "node": "Ambil URL Video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tunggu 20 detik",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tunggu 20 detik": {
+      "main": [
+        [
+          {
+            "node": "Cek Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ambil URL Video": {
+      "main": [
+        [
+          {
+            "node": "Unduh Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unduh Video": {
+      "main": [
+        [
+          {
+            "node": "Upload ke Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "22a7c476-1ed3-49d4-b02d-ffeb69f0e861",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "dc96f10ae7dc95d3c138575ba243a0a167923dbcb524841d451aadf9135d5fb3"
+  },
+  "nodeGroups": [],
+  "id": "gm4aNgQWqjeL3Mzg",
+  "tags": []
+}
